@@ -44,6 +44,10 @@ live-boot
 live-config
 live-config-systemd
 systemd-sysv
+dbus
+dbus-user-session
+libpam-systemd
+procps
 sudo
 xserver-xorg-core
 xserver-xorg-video-all
@@ -100,16 +104,51 @@ EOF
 mkdir -p config/includes.chroot/opt/nova-os/session
 cat > config/includes.chroot/opt/nova-os/session/bash_profile <<'EOF'
 if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-  exec startx -- -nocursor >/dev/null 2>&1
+  exec startx -- -nocursor >/tmp/nova-startx.log 2>&1
 fi
 EOF
 cat > config/includes.chroot/opt/nova-os/session/xinitrc <<'EOF'
 xset s off -dpms s noblank
 unclutter -idle 3 &
 while true; do
-  /opt/nova-os/electron/electron /opt/nova-os --console
+  /opt/nova-os/electron/electron /opt/nova-os --console >>/tmp/nova-electron.log 2>&1
   sleep 1
 done
+EOF
+
+# Debug report: boot with "nova.debug" on the kernel command line and a status report
+# is written to the serial port (used by the automatic VM test).
+cat > config/includes.chroot/opt/nova-os/session/debug-report <<'EOF'
+#!/bin/sh
+sleep 75
+{
+  echo "===== NOVA DEBUG REPORT ====="
+  echo "--- failed units"; systemctl --failed --no-pager
+  echo "--- sessions"; loginctl list-sessions --no-pager
+  echo "--- getty@tty1"; systemctl status getty@tty1 --no-pager -l | tail -20
+  echo "--- processes"; ps -eo user,pid,args | grep -E "agetty|login|bash|startx|xinit|Xorg|electron" | grep -v grep
+  echo "--- user nova"; id nova; ls -la /home/nova
+  echo "--- startx log"; cat /tmp/nova-startx.log
+  echo "--- electron log"; tail -60 /tmp/nova-electron.log
+  echo "--- Xorg log"; tail -60 /home/nova/.local/share/xorg/Xorg.0.log 2>/dev/null || tail -60 /var/log/Xorg.0.log
+  echo "--- journal warnings"; journalctl -b -p warning --no-pager | tail -80
+  echo "===== END NOVA DEBUG REPORT ====="
+} > /dev/ttyS0 2>&1
+EOF
+chmod +x config/includes.chroot/opt/nova-os/session/debug-report
+mkdir -p config/includes.chroot/etc/systemd/system
+cat > config/includes.chroot/etc/systemd/system/nova-debug.service <<'EOF'
+[Unit]
+Description=Nova OS debug report on serial port
+ConditionKernelCommandLine=nova.debug
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/nova-os/session/debug-report
+
+[Install]
+WantedBy=multi-user.target
 EOF
 
 # runs inside the image while it is being built
@@ -125,6 +164,7 @@ chown root:root /opt/nova-os/electron/chrome-sandbox
 chmod 4755 /opt/nova-os/electron/chrome-sandbox
 chmod +x /opt/nova-os/electron/electron
 systemctl enable NetworkManager || true
+systemctl enable nova-debug.service || true
 plymouth-set-default-theme spinner || true
 EOF
 chmod +x config/hooks/live/0100-nova.hook.chroot
