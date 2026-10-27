@@ -1,7 +1,7 @@
 // Nova OS - system process.
 // --emulator : runs in a window on your PC (the "emulator")
 // --console  : runs full screen like a real console (used by the installer and the ISO)
-const { app, BrowserWindow, ipcMain, session } = require('electron');
+const { app, BrowserWindow, ipcMain, session, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
@@ -12,9 +12,12 @@ const emulator = process.argv.includes('--emulator') || !process.argv.includes('
 let win;
 
 function createWindow() {
+  // On a real install there is no window manager to make the window full screen, so cover the screen ourselves.
+  const full = emulator ? null : screen.getPrimaryDisplay().bounds;
   win = new BrowserWindow({
-    width: 1280,
-    height: 760,
+    ...(full ? { x: full.x, y: full.y, width: full.width, height: full.height, frame: false } : {}),
+    width: full ? full.width : 1280,
+    height: full ? full.height : 760,
     minWidth: 960,
     minHeight: 560,
     backgroundColor: '#000000',
@@ -29,6 +32,11 @@ function createWindow() {
     },
   });
   win.setMenuBarVisibility(false);
+  if (full) {
+    const fit = () => { const b = screen.getPrimaryDisplay().bounds; win.setBounds(b); };
+    screen.on('display-metrics-changed', fit);
+    screen.on('display-added', fit);
+  }
   win.loadFile(path.join(__dirname, 'os', 'index.html'));
 }
 const send = (channel, data) => { if (win && !win.isDestroyed()) win.webContents.send(channel, data); };
