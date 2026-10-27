@@ -36,7 +36,7 @@ jobs:
           # boot the ISO's own kernel directly so we can add a serial console + debug report
           mkdir -p /mnt/iso && mount -o loop,ro dist/nova-os-amd64.iso /mnt/iso
           ls /mnt/iso/live
-          cp /mnt/iso/live/vmlinuz* /tmp/vmlinuz; cp /mnt/iso/live/initrd.img* /tmp/initrd.img
+          cp /mnt/iso/live/vmlinuz /tmp/vmlinuz; cp /mnt/iso/live/initrd.img /tmp/initrd.img
           APPEND="$(grep -m1 -o 'boot=live[^"]*' /mnt/iso/isolinux/live.cfg 2>/dev/null || echo 'boot=live components quiet splash')"
           umount /mnt/iso
           echo "Kernel options: $APPEND"
