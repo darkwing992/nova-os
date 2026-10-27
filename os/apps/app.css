@@ -1,0 +1,12 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #07080f; color: #eef0ff; font-family: "Segoe UI", "Noto Sans", system-ui, sans-serif; overflow: hidden; user-select: none; }
+.stage { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+canvas { display: block; border-radius: 12px; box-shadow: 0 0 60px rgba(0,0,0,.6); max-width: 96vw; max-height: 82vh; }
+.hud { display: flex; gap: 30px; font-weight: 700; font-size: 20px; letter-spacing: 1px; }
+.hud span { color: #8b90b3; font-weight: 600; margin-right: 6px; font-size: 14px; }
+.help { color: #8b90b3; font-size: 13px; }
+.overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(5,6,12,.75); gap: 10px; text-align: center; }
+.overlay h1 { font-size: 54px; margin: 0; }
+.overlay p { color: #b6bbdd; margin: 0; }
+.hidden { display: none !important; }
+button { font: inherit; color: inherit; cursor: pointer; }

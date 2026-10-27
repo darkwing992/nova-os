@@ -1,0 +1,53 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Synth Pad</title><link rel="stylesheet" href="app.css">
+<style>
+body { background: linear-gradient(160deg, #1b0f2e, #0a0f2e); }
+.sounds { display: flex; gap: 10px; }
+.sounds button { background: rgba(255,255,255,.08); border: 0; border-radius: 20px; padding: 8px 18px; }
+.sounds button.on { background: #fc466b; }
+.piano { display: flex; position: relative; height: 260px; }
+.w { width: 64px; height: 260px; background: #f4f4f8; border: 1px solid #aaa; border-radius: 0 0 10px 10px; color: #777; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px; font-size: 13px; }
+.b { width: 40px; height: 160px; background: #111; position: absolute; top: 0; border-radius: 0 0 8px 8px; z-index: 2; color: #888; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px; font-size: 12px; }
+.w.down { background: #ffd1dc; } .b.down { background: #fc466b; }
+</style></head>
+<body>
+<div class="stage">
+  <h1 style="margin:0">🎹 Synth Pad</h1>
+  <div class="sounds" id="sounds"></div>
+  <div class="piano" id="piano"></div>
+  <div class="help">Play with your keyboard (A S D F G H J K L ; and W E T Y U O P) or click the keys</div>
+</div>
+<script src="sdk.js"></script>
+<script>
+const WHITE = [['C', 'KeyA'], ['D', 'KeyS'], ['E', 'KeyD'], ['F', 'KeyF'], ['G', 'KeyG'], ['A', 'KeyH'], ['B', 'KeyJ'], ['C', 'KeyK'], ['D', 'KeyL'], ['E', 'Semicolon']];
+const BLACK = [['C#', 'KeyW', 0], ['D#', 'KeyE', 1], ['F#', 'KeyT', 3], ['G#', 'KeyY', 4], ['A#', 'KeyU', 5], ['C#', 'KeyO', 7], ['D#', 'KeyP', 8]];
+const SEMI = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
+const SOUNDS = { Piano: 'triangle', Organ: 'sine', Retro: 'square', Buzz: 'sawtooth' };
+let wave = 'triangle', ctx; const live = {};
+const sEl = document.getElementById('sounds');
+Object.entries(SOUNDS).forEach(([n, w], i) => { const b = document.createElement('button'); b.textContent = n; if (!i) b.className = 'on';
+  b.onclick = () => { wave = w; sEl.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; sEl.appendChild(b); });
+const piano = document.getElementById('piano'), keyEls = {};
+const freq = (note, oct) => 261.63 * Math.pow(2, (SEMI[note] + oct * 12) / 12);
+WHITE.forEach(([n, code], i) => { const d = document.createElement('div'); d.className = 'w'; d.textContent = code.replace('Key', '').replace('Semicolon', ';');
+  d.dataset.f = freq(n, i >= 7 ? 1 : 0); keyEls[code] = d; piano.appendChild(d); });
+BLACK.forEach(([n, code, after]) => { const d = document.createElement('div'); d.className = 'b'; d.textContent = code.replace('Key', '');
+  d.style.left = (after + 1) * 64 - 20 + 'px'; d.dataset.f = freq(n, after >= 7 ? 1 : 0); keyEls[code] = d; piano.appendChild(d); });
+function on(code) {
+  const el = keyEls[code]; if (!el || live[code]) return;
+  ctx = ctx || new AudioContext();
+  const o = ctx.createOscillator(), g = ctx.createGain(); o.type = wave; o.frequency.value = +el.dataset.f;
+  g.gain.setValueAtTime(0, ctx.currentTime); g.gain.linearRampToValueAtTime(0.18, ctx.currentTime + 0.01);
+  o.connect(g).connect(ctx.destination); o.start(); live[code] = { o, g }; el.classList.add('down');
+}
+function off(code) {
+  const v = live[code]; if (!v) return; delete live[code]; keyEls[code].classList.remove('down');
+  v.g.gain.cancelScheduledValues(ctx.currentTime); v.g.gain.setValueAtTime(v.g.gain.value, ctx.currentTime);
+  v.g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4); v.o.stop(ctx.currentTime + 0.45);
+}
+addEventListener('keydown', (e) => { if (!e.repeat) on(e.code); });
+addEventListener('keyup', (e) => off(e.code));
+Object.entries(keyEls).forEach(([code, el]) => { el.onpointerdown = () => on(code); el.onpointerup = el.onpointerleave = () => off(code); });
+(function loop() { Nova.poll(); requestAnimationFrame(loop); })();
+</script>
+</body></html>

@@ -1,0 +1,129 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Brick Breaker</title><link rel="stylesheet" href="app.css"></head>
+<body>
+<div class="stage">
+  <div class="hud"><div><span>SCORE</span><b id="score">0</b></div><div><span>LEVEL</span><b id="lvl">1</b></div><div><span>LIVES</span><b id="lives">3</b></div><div><span>BEST</span><b id="best">0</b></div></div>
+  <canvas id="c" width="800" height="560"></canvas>
+  <div class="help">Left/Right, mouse or stick to move · Enter / A launches the ball · P to pause</div>
+</div>
+<div class="overlay" id="ov"><h1 id="ovT">BRICK BREAKER</h1><p id="ovP">Press Enter or A to start</p></div>
+<script src="sdk.js"></script>
+<script>
+const c = document.getElementById('c'), x = c.getContext('2d');
+const COLS = 12, ROWS_BASE = 5, BW = c.width / COLS, BH = 24;
+let paddle, balls, bricks, drops, score, lives, level, best = Nova.load('breaker.best', 0), state = 'menu', last = 0, mouseX = null;
+const $ = (id) => document.getElementById(id);
+$('best').textContent = best;
+c.addEventListener('mousemove', (e) => { const r = c.getBoundingClientRect(); mouseX = (e.clientX - r.left) * (c.width / r.width); });
+c.addEventListener('click', () => { if (state === 'play') launch(); });
+
+function newGame() { score = 0; lives = 3; level = 1; buildLevel(); hud(); }
+function buildLevel() {
+  bricks = [];
+  const rows = Math.min(ROWS_BASE + level - 1, 10);
+  for (let r = 0; r < rows; r++) for (let col = 0; col < COLS; col++) {
+    if ((level % 3 === 2) && (col + r) % 4 === 0) continue; // patterned levels
+    const hp = r < level - 2 ? 2 : 1;
+    bricks.push({ x: col * BW + 2, y: 60 + r * (BH + 4), w: BW - 4, h: BH, hp, hue: (r * 32 + level * 40) % 360 });
+  }
+  paddle = { x: c.width / 2, w: 120, y: c.height - 30 };
+  drops = []; resetBall();
+}
+function resetBall() { balls = [{ x: paddle.x, y: paddle.y - 12, vx: 0, vy: 0, r: 8, stuck: true }]; }
+function launch() { balls.forEach((b) => { if (b.stuck) { b.stuck = false; const s = 380 + level * 25; b.vx = (Math.random() - 0.5) * s * 0.8; b.vy = -s; } }); }
+function hud() { $('score').textContent = score; $('lvl').textContent = level; $('lives').textContent = lives; }
+function overlay(t, p) { $('ov').classList.toggle('hidden', !t); if (t) { $('ovT').textContent = t; $('ovP').textContent = p; } }
+
+function update(dt) {
+  const speed = 700;
+  if (Nova.down('left')) paddle.x -= speed * dt;
+  if (Nova.down('right')) paddle.x += speed * dt;
+  if (mouseX != null) { paddle.x += (mouseX - paddle.x) * Math.min(1, dt * 20); }
+  paddle.x = Math.max(paddle.w / 2, Math.min(c.width - paddle.w / 2, paddle.x));
+  if (Nova.tap('a')) launch();
+
+  for (const b of balls) {
+    if (b.stuck) { b.x = paddle.x; b.y = paddle.y - 12; continue; }
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    if (b.x < b.r) { b.x = b.r; b.vx *= -1; Nova.beep(300, 0.03); }
+    if (b.x > c.width - b.r) { b.x = c.width - b.r; b.vx *= -1; Nova.beep(300, 0.03); }
+    if (b.y < b.r) { b.y = b.r; b.vy *= -1; Nova.beep(300, 0.03); }
+    // paddle
+    if (b.vy > 0 && b.y + b.r > paddle.y - 7 && b.y < paddle.y + 7 && Math.abs(b.x - paddle.x) < paddle.w / 2 + b.r) {
+      const hit = (b.x - paddle.x) / (paddle.w / 2);
+      const s = Math.hypot(b.vx, b.vy) * 1.01;
+      b.vx = s * Math.sin(hit * 1.05); b.vy = -Math.abs(s * Math.cos(hit * 1.05));
+      Nova.beep(520, 0.04);
+    }
+    // bricks
+    for (const k of bricks) {
+      if (k.hp <= 0) continue;
+      if (b.x + b.r > k.x && b.x - b.r < k.x + k.w && b.y + b.r > k.y && b.y - b.r < k.y + k.h) {
+        const ox = Math.min(b.x + b.r - k.x, k.x + k.w - (b.x - b.r));
+        const oy = Math.min(b.y + b.r - k.y, k.y + k.h - (b.y - b.r));
+        if (ox < oy) b.vx *= -1; else b.vy *= -1;
+        k.hp--; score += 10; hud(); Nova.beep(700 + Math.random() * 300, 0.05);
+        if (k.hp <= 0 && Math.random() < 0.14) drops.push({ x: k.x + k.w / 2, y: k.y, type: Math.random() < 0.5 ? 'wide' : 'multi' });
+        break;
+      }
+    }
+  }
+  balls = balls.filter((b) => b.y < c.height + 20);
+  if (!balls.length) {
+    lives--; hud(); Nova.beep(120, 0.4, 'sawtooth');
+    if (lives <= 0) {
+      state = 'over';
+      if (score > best) { best = score; Nova.save('breaker.best', best); $('best').textContent = best; Nova.toast('🧱 New high score: ' + best); }
+      return overlay('GAME OVER', `Score ${score} · Press Enter or A to play again`);
+    }
+    paddle.w = 120; resetBall();
+  }
+  for (const d of drops) {
+    d.y += 200 * dt;
+    if (d.y > paddle.y - 10 && d.y < paddle.y + 10 && Math.abs(d.x - paddle.x) < paddle.w / 2) {
+      d.got = true; Nova.beep(990, 0.12, 'triangle');
+      if (d.type === 'wide') paddle.w = Math.min(220, paddle.w + 50);
+      else { const b0 = balls.find((b) => !b.stuck) || balls[0]; const s = Math.hypot(b0.vx, b0.vy) || 400;
+        for (const a of [-0.5, 0.5]) balls.push({ x: b0.x, y: b0.y, vx: s * Math.sin(a), vy: -s * Math.cos(a), r: 8 }); }
+    }
+  }
+  drops = drops.filter((d) => !d.got && d.y < c.height);
+  if (bricks.every((k) => k.hp <= 0)) { level++; hud(); Nova.toast('Level ' + level + '!'); buildLevel(); }
+}
+
+function draw() {
+  const g = x.createLinearGradient(0, 0, 0, c.height); g.addColorStop(0, '#120a24'); g.addColorStop(1, '#05060c');
+  x.fillStyle = g; x.fillRect(0, 0, c.width, c.height);
+  for (const k of bricks) {
+    if (k.hp <= 0) continue;
+    x.fillStyle = `hsl(${k.hue}, 85%, ${k.hp > 1 ? 40 : 58}%)`;
+    x.fillRect(k.x, k.y, k.w, k.h);
+    x.fillStyle = 'rgba(255,255,255,.25)'; x.fillRect(k.x, k.y, k.w, 4);
+  }
+  x.shadowBlur = 18; x.shadowColor = '#ffb347';
+  x.fillStyle = '#ffb347'; x.fillRect(paddle.x - paddle.w / 2, paddle.y - 7, paddle.w, 14);
+  x.fillStyle = '#fff'; x.shadowColor = '#fff';
+  for (const b of balls) { x.beginPath(); x.arc(b.x, b.y, b.r, 0, 7); x.fill(); }
+  x.shadowBlur = 0; x.font = 'bold 14px sans-serif'; x.textAlign = 'center';
+  for (const d of drops) { x.fillStyle = d.type === 'wide' ? '#00d4ff' : '#ff5cc8'; x.fillRect(d.x - 22, d.y - 9, 44, 18); x.fillStyle = '#000'; x.fillText(d.type === 'wide' ? 'WIDE' : 'x3', d.x, d.y + 5); }
+}
+
+function loop(t) {
+  const dt = Math.min(0.033, (t - last) / 1000); last = t;
+  const inp = Nova.poll();
+  if (inp.ax) { paddle.x += inp.ax * 750 * dt; mouseX = null; }
+  if (Nova.down('left') || Nova.down('right')) mouseX = null;
+  if (state === 'play') {
+    if (Nova.key('KeyP') && !Nova._p || Nova.tap('b')) { state = 'pause'; overlay('PAUSED', 'Press Enter or A to keep going'); }
+    else update(dt);
+  } else if (Nova.tap('a')) {
+    if (state !== 'pause') newGame();
+    state = 'play'; overlay();
+  }
+  Nova._p = Nova.key('KeyP');
+  draw();
+  requestAnimationFrame(loop);
+}
+newGame(); requestAnimationFrame(loop);
+</script>
+</body></html>

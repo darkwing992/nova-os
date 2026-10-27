@@ -1,0 +1,14 @@
+{
+  "name": "nova-os",
+  "version": "2.0.0",
+  "description": "Nova OS - a console-style operating system shell with a library, app store, web browser and games",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron . --console",
+    "emulator": "electron . --emulator"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "electron": "^33.2.1"
+  }
+}

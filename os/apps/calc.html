@@ -1,0 +1,56 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Calculator</title><link rel="stylesheet" href="app.css">
+<style>
+.calc { width: 380px; background: #1b1c26; border-radius: 24px; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.screen { text-align: right; font-size: 52px; font-weight: 300; padding: 20px 8px 6px; overflow: hidden; white-space: nowrap; }
+.expr { text-align: right; color: #8b90b3; min-height: 22px; padding: 0 8px; }
+.keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
+.keys button { height: 72px; border: 0; border-radius: 50px; font-size: 26px; background: #2d2f3d; }
+.keys button.op { background: #ff9f0a; } .keys button.fn { background: #5a5d72; }
+.keys button.sel { outline: 3px solid #7c5cff; outline-offset: 2px; }
+.keys .zero { grid-column: span 2; }
+</style></head>
+<body>
+<div class="stage"><div class="calc"><div class="expr" id="expr"></div><div class="screen" id="out">0</div><div class="keys" id="keys"></div></div></div>
+<script src="sdk.js"></script>
+<script>
+const KEYS = ['C', '±', '%', '÷', '7', '8', '9', '×', '4', '5', '6', '−', '1', '2', '3', '+', '0', '.', '='];
+let a = null, op = null, cur = '0', fresh = true, sel = 0;
+const out = document.getElementById('out'), keysEl = document.getElementById('keys');
+const btns = KEYS.map((k) => { const b = document.createElement('button'); b.textContent = k;
+  b.className = '÷×−+='.includes(k) ? 'op' : 'C±%'.includes(k) ? 'fn' : ''; if (k === '0') b.classList.add('zero');
+  b.onclick = () => press(k); keysEl.appendChild(b); return b; });
+const calc = (x, y, o) => ({ '+': x + y, '−': x - y, '×': x * y, '÷': y === 0 ? NaN : x / y })[o];
+const fmt = (n) => (isNaN(n) ? 'Error' : String(+n.toPrecision(12)));
+function press(k) {
+  if (/\d/.test(k)) { cur = fresh || cur === '0' ? k : cur + k; fresh = false; }
+  else if (k === '.') { if (fresh) { cur = '0.'; fresh = false; } else if (!cur.includes('.')) cur += '.'; }
+  else if (k === 'C') { a = null; op = null; cur = '0'; fresh = true; }
+  else if (k === '±') cur = fmt(-parseFloat(cur));
+  else if (k === '%') cur = fmt(parseFloat(cur) / 100);
+  else if (k === '=') { if (op != null) { cur = fmt(calc(a, parseFloat(cur), op)); a = null; op = null; fresh = true; } }
+  else { if (op != null && !fresh) cur = fmt(calc(a, parseFloat(cur), op)); a = parseFloat(cur); op = k; fresh = true; }
+  out.textContent = cur; document.getElementById('expr').textContent = op ? `${fmt(a)} ${op}` : '';
+}
+addEventListener('keydown', (e) => { const m = { '/': '÷', '*': '×', '-': '−', '+': '+', Enter: '=', '=': '=', Escape: 'C', Delete: 'C', '.': '.' };
+  if (/^\d$/.test(e.key)) press(e.key); else if (m[e.key] && !Nova._pad) press(m[e.key]); });
+const rows = [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15], [16, 16, 17, 18]];
+function pos(i) { for (let r = 0; r < rows.length; r++) { const c = rows[r].indexOf(i); if (c >= 0) return [r, c]; } }
+(function loop() {
+  Nova.poll();
+  const hasPad = navigator.getGamepads && [...navigator.getGamepads()].some(Boolean);
+  if (hasPad) {
+    let [r, c] = pos(sel);
+    if (Nova.tap('up')) r = Math.max(0, r - 1); if (Nova.tap('down')) r = Math.min(4, r + 1);
+    if (Nova.tap('left')) c = Math.max(0, c - 1); if (Nova.tap('right')) c = Math.min(3, c + 1);
+    if (Nova.tap('left') && rows[r][c] === sel) c = Math.max(0, c - 1);
+    sel = rows[r][c];
+    const p = navigator.getGamepads(); const g = [...p].find(Boolean);
+    if (g && g.buttons[0].pressed && !Nova._a) press(KEYS[sel]);
+    Nova._a = g && g.buttons[0].pressed;
+    btns.forEach((b, i) => b.classList.toggle('sel', i === sel));
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body></html>

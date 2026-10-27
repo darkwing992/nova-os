@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nova OS</title>
+<link rel="stylesheet" href="style.css?v=4">
+</head>
+<body>
+<canvas id="bg"></canvas>
+
+<!-- BOOT -->
+<div id="boot" class="layer">
+  <div class="boot-logo"><span class="nova-mark"></span><span class="boot-word">NOVA</span></div>
+  <div class="boot-bar"><div></div></div>
+</div>
+
+<!-- WELCOME (press to start) -->
+<div id="welcome" class="layer hidden">
+  <div class="corner-logo"><span class="nova-mark small"></span>NOVA</div>
+  <div class="welcome-text">
+    <h1 id="welcomeTitle">Welcome back to Nova</h1>
+    <p>Press <b>Enter</b> or the <span class="btn-glyph">A</span> button to start.</p>
+  </div>
+</div>
+
+<!-- FIRST-TIME SETUP -->
+<div id="setup" class="layer hidden">
+  <div class="setup-card glass">
+    <div class="corner-logo inline"><span class="nova-mark small"></span>NOVA</div>
+    <h1>Set up your console</h1>
+    <label>Your name</label>
+    <input id="setupName" class="nav" maxlength="16" placeholder="Player 1">
+    <label>Theme</label>
+    <div class="swatches" id="setupThemes"></div>
+    <button id="setupDone" class="nav btn primary">Continue</button>
+  </div>
+</div>
+
+<!-- SHELL -->
+<div id="shell" class="hidden">
+  <header class="func-row" id="funcRow">
+    <div class="func-icons" id="funcIcons"></div>
+    <div class="func-right">
+      <button class="nav who" id="whoBtn"><span class="avatar" id="avatar">P</span><span id="profileName">Player 1</span></button>
+      <span class="trophy" title="High scores"><svg viewBox="0 0 24 24"><path d="M7 4h10v3a5 5 0 0 1-10 0V4Zm10 1h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3m5 2v4m-4 4h8m-6 0 1-4h2l1 4"/></svg><span id="trophyCount">0</span></span>
+      <span id="padIcon" class="pad-icon" title="Controller"><svg viewBox="0 0 24 24"><path d="M6 9h4M8 7v4m7-1h.01M18 8h.01M7 5h10a4 4 0 0 1 4 4l1 6a3 3 0 0 1-5 2l-2-2H9l-2 2a3 3 0 0 1-5-2l1-6a4 4 0 0 1 4-4Z"/></svg></span>
+      <span id="clock">--:--</span>
+    </div>
+  </header>
+
+  <!-- HOME: the content bar -->
+  <section id="home" class="view active">
+    <div class="bar-wrap"><div class="bar" id="bar"></div></div>
+    <div class="selected-info">
+      <div class="sel-name" id="selName"></div>
+      <div class="sel-sub" id="selSub"></div>
+      <div class="sel-actions">
+        <button class="nav btn primary" id="selStart">Start</button>
+        <button class="nav btn ghost" id="selDetails">Options</button>
+      </div>
+      <div class="sel-desc" id="selDesc"></div>
+    </div>
+    <div class="hint-bar">
+      <span><i class="btn-glyph">A</i> Start</span><span><i class="btn-glyph">B</i> Back</span><span><i class="btn-glyph sq">≡</i> Power</span><span><i class="key">F1</i> Home from any app</span>
+    </div>
+  </section>
+
+  <!-- FULL PAGES -->
+  <section id="page" class="view">
+    <div class="page-head">
+      <button class="nav back-btn" id="pageBack">‹ Home</button>
+      <h1 id="pageTitle"></h1>
+      <div class="chips" id="pageChips"></div>
+    </div>
+    <div class="page-body">
+      <div class="pg" id="pg-library"><div class="grid" id="libGrid"></div></div>
+
+      <div class="pg" id="pg-store">
+        <div class="store-grid" id="storeGrid"></div>
+        <div class="glass panel">
+          <h2>⬇ Download an app from the web</h2>
+          <p class="muted">Paste a link to a game or app file (<b>.zip</b>, <b>.nova</b> or <b>.html</b>) and Nova downloads and installs it. Paste a normal website and it becomes a web app.</p>
+          <div class="row">
+            <input id="dlUrl" class="nav" placeholder="https://example.com/my-game.zip">
+            <input id="dlName" class="nav short" placeholder="Name (optional)">
+            <button id="dlGo" class="nav btn primary">Install</button>
+          </div>
+          <h3>Find free games to download</h3>
+          <div class="row" id="findLinks"></div>
+        </div>
+      </div>
+
+      <div class="pg" id="pg-downloads"><div id="dlList" class="dl-list"></div></div>
+
+      <div class="pg" id="pg-web">
+        <div class="browser glass">
+          <div class="browser-bar">
+            <button class="nav icon-btn" id="webBack" title="Back">‹</button>
+            <button class="nav icon-btn" id="webFwd" title="Forward">›</button>
+            <button class="nav icon-btn" id="webReload" title="Reload">⟳</button>
+            <button class="nav icon-btn" id="webHome" title="Start page">⌂</button>
+            <input id="webUrl" class="nav" placeholder="Search or type a web address">
+            <button class="nav btn primary" id="webGo">Go</button>
+            <button class="nav icon-btn" id="webStar" title="Bookmark">☆</button>
+          </div>
+          <div class="browser-body" id="webBody"></div>
+        </div>
+      </div>
+
+      <div class="pg" id="pg-settings">
+        <div class="settings">
+          <div class="glass panel">
+            <h2>Profile</h2>
+            <label>Name</label>
+            <input id="setName" class="nav" maxlength="16">
+          </div>
+          <div class="glass panel">
+            <h2>Theme</h2>
+            <div class="swatches" id="setThemes"></div>
+            <label class="check"><input type="checkbox" id="setSounds" class="nav"> Menu sounds</label>
+            <label class="check"><input type="checkbox" id="setMotion" class="nav"> Animated background</label>
+            <button class="nav btn ghost" id="setFullscreen">Toggle full screen</button>
+          </div>
+          <div class="glass panel">
+            <h2>Network</h2>
+            <p id="netStatus" class="muted"></p>
+            <button class="nav btn ghost" id="wifiScan">Find Wi-Fi networks</button>
+            <div id="wifiList" class="wifi-list"></div>
+          </div>
+          <div class="glass panel">
+            <h2>Storage</h2>
+            <p id="storageInfo" class="muted"></p>
+            <button class="nav btn ghost" id="setResetApps">Restore default apps</button>
+            <button class="nav btn danger" id="setFactory">Factory reset</button>
+          </div>
+          <div class="glass panel">
+            <h2>System</h2>
+            <p id="sysInfo" class="muted"></p>
+            <p class="muted">Arrows / D-pad move · Enter / A select · Esc / B back · F1 or Home button returns Home from any app · F11 full screen</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- RUNNING APP -->
+<div id="appView" class="hidden">
+  <div class="app-host" id="appHost"></div>
+  <button class="home-pill" id="homePill" title="Quick menu (F1 for Home)">⌂</button>
+</div>
+
+<!-- QUICK MENU / POWER -->
+<div id="guide" class="overlay hidden">
+  <div class="guide-card glass">
+    <h2 id="guideTitle">Nova</h2>
+    <div class="guide-list" id="guideList"></div>
+  </div>
+</div>
+
+<!-- APP DETAILS -->
+<div id="detail" class="overlay hidden"><div class="detail-card glass" id="detailCard"></div></div>
+
+<div id="toasts"></div>
+
+<script src="catalog.js?v=4"></script>
+<script src="nav.js?v=4"></script>
+<script src="background.js?v=4"></script>
+<script src="os.js?v=4"></script>
+</body>
+</html>

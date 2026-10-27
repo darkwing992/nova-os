@@ -1,0 +1,87 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Astro Dodge</title><link rel="stylesheet" href="app.css">
+<style>canvas { border-radius: 0; max-height: 100vh; max-width: 100vw; box-shadow: none; } .hud { position: absolute; top: 14px; left: 20px; } .help { position: absolute; bottom: 10px; }</style></head>
+<body>
+<div class="stage">
+  <canvas id="c" width="1280" height="720"></canvas>
+  <div class="hud"><div><span>SCORE</span><b id="score">0</b></div><div><span>SHIELD</span><b id="hp">3</b></div><div><span>BEST</span><b id="best">0</b></div></div>
+  <div class="help">Move with arrows / WASD / stick · Space or A to shoot · P to pause</div>
+</div>
+<div class="overlay" id="ov"><h1 id="ovT">ASTRO DODGE</h1><p id="ovP">Press Enter or A to launch</p></div>
+<script src="sdk.js"></script>
+<script>
+const c = document.getElementById('c'), x = c.getContext('2d');
+const $ = (id) => document.getElementById(id);
+let ship, rocks, shots, parts, score, hp, spawn, cool, inv, state = 'menu', last = 0, best = Nova.load('astro.best', 0);
+$('best').textContent = best;
+const stars = Array.from({ length: 160 }, () => ({ x: Math.random() * c.width, y: Math.random() * c.height, z: Math.random() * 3 + 0.5 }));
+
+function newGame() { ship = { x: 200, y: c.height / 2 }; rocks = []; shots = []; parts = []; score = 0; hp = 3; spawn = 0; cool = 0; inv = 0; hudUp(); }
+function hudUp() { $('score').textContent = Math.floor(score); $('hp').textContent = hp; }
+function overlay(t, p) { $('ov').classList.toggle('hidden', !t); if (t) { $('ovT').textContent = t; $('ovP').textContent = p; } }
+function boom(px, py, col, n = 18) { for (let i = 0; i < n; i++) { const a = Math.random() * 7, s = 60 + Math.random() * 240; parts.push({ x: px, y: py, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.6, col }); } }
+
+function update(dt) {
+  const inp = { ax: Nova.down('right') - Nova.down('left') + (Nova._in.ax || 0), ay: Nova.down('down') - Nova.down('up') + (Nova._in.ay || 0) };
+  ship.x = Math.max(30, Math.min(c.width - 30, ship.x + inp.ax * 460 * dt));
+  ship.y = Math.max(30, Math.min(c.height - 30, ship.y + inp.ay * 460 * dt));
+  cool -= dt; inv -= dt;
+  if ((Nova.down('a') || Nova.key('Space')) && cool <= 0) { shots.push({ x: ship.x + 26, y: ship.y }); cool = 0.18; Nova.beep(1200, 0.04, 'square', 0.02); }
+  score += dt * 10;
+  const diff = 1 + score / 400;
+  spawn -= dt;
+  if (spawn <= 0) { spawn = Math.max(0.18, 0.9 / diff); const r = 18 + Math.random() * 40;
+    rocks.push({ x: c.width + r, y: Math.random() * c.height, r, vx: -(140 + Math.random() * 160) * diff, vy: (Math.random() - 0.5) * 80, rot: 0, spin: (Math.random() - 0.5) * 3, hp: Math.ceil(r / 22),
+      pts: Array.from({ length: 10 }, (_, i) => 0.75 + Math.random() * 0.3) }); }
+  for (const s of shots) s.x += 900 * dt;
+  for (const r of rocks) {
+    r.x += r.vx * dt; r.y += r.vy * dt; r.rot += r.spin * dt;
+    for (const s of shots) if (!s.dead && Math.hypot(s.x - r.x, s.y - r.y) < r.r) { s.dead = true; r.hp--; boom(s.x, s.y, '#ffd67a', 5);
+      if (r.hp <= 0) { r.dead = true; score += Math.round(r.r); boom(r.x, r.y, '#b9a7ff', 26); Nova.beep(160, 0.15, 'sawtooth', 0.05); } }
+    if (!r.dead && inv <= 0 && Math.hypot(ship.x - r.x, ship.y - r.y) < r.r + 16) {
+      r.dead = true; hp--; inv = 1.5; boom(ship.x, ship.y, '#ff5c5c', 30); Nova.beep(90, 0.4, 'sawtooth', 0.08);
+      if (hp <= 0) {
+        state = 'over'; score = Math.floor(score);
+        if (score > best) { best = score; Nova.save('astro.best', best); $('best').textContent = best; Nova.toast('🚀 New high score: ' + best); }
+        overlay('SHIP DESTROYED', `Score ${score} · Press Enter or A to fly again`);
+      }
+    }
+  }
+  rocks = rocks.filter((r) => !r.dead && r.x > -100); shots = shots.filter((s) => !s.dead && s.x < c.width + 20);
+  hudUp();
+}
+
+function draw(dt) {
+  x.fillStyle = '#03030a'; x.fillRect(0, 0, c.width, c.height);
+  for (const s of stars) { s.x -= s.z * (state === 'play' ? 90 : 25) * dt; if (s.x < 0) { s.x = c.width; s.y = Math.random() * c.height; }
+    x.fillStyle = `rgba(255,255,255,${s.z / 3.5})`; x.fillRect(s.x, s.y, s.z, s.z); }
+  for (const r of rocks) {
+    x.save(); x.translate(r.x, r.y); x.rotate(r.rot); x.beginPath();
+    r.pts.forEach((p, i) => { const a = (i / r.pts.length) * Math.PI * 2; x[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r.r * p, Math.sin(a) * r.r * p); });
+    x.closePath(); x.fillStyle = '#3b3550'; x.fill(); x.strokeStyle = '#8f86b8'; x.lineWidth = 2; x.stroke(); x.restore();
+  }
+  x.fillStyle = '#ffe27a'; for (const s of shots) x.fillRect(s.x - 10, s.y - 2, 20, 4);
+  for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; x.globalAlpha = Math.max(0, p.life / 0.6); x.fillStyle = p.col; x.fillRect(p.x, p.y, 3, 3); }
+  x.globalAlpha = 1; parts = parts.filter((p) => p.life > 0);
+  if (state !== 'over' && ship && (inv <= 0 || Math.floor(inv * 10) % 2)) {
+    x.save(); x.translate(ship.x, ship.y);
+    x.fillStyle = '#ff8a3d'; x.beginPath(); x.moveTo(-18, -6); x.lineTo(-30 - Math.random() * 12, 0); x.lineTo(-18, 6); x.fill();
+    x.shadowBlur = 20; x.shadowColor = '#7597de'; x.fillStyle = '#dfe6ff';
+    x.beginPath(); x.moveTo(26, 0); x.lineTo(-18, -16); x.lineTo(-12, 0); x.lineTo(-18, 16); x.closePath(); x.fill(); x.restore();
+  }
+}
+
+function loop(t) {
+  const dt = Math.min(0.033, (t - last) / 1000); last = t;
+  Nova._in = Nova.poll();
+  if (state === 'play') {
+    if ((Nova.key('KeyP') && !Nova._p) || Nova.tap('b')) { state = 'pause'; overlay('PAUSED', 'Press Enter or A to keep going'); }
+    else update(dt);
+  } else if (Nova.tap('a')) { if (state !== 'pause') newGame(); state = 'play'; overlay(); }
+  Nova._p = Nova.key('KeyP');
+  draw(dt);
+  requestAnimationFrame(loop);
+}
+newGame(); requestAnimationFrame(loop);
+</script>
+</body></html>

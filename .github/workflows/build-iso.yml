@@ -1,0 +1,67 @@
+# Builds the Nova OS ISO in the cloud, test-boots it in a virtual machine,
+# and publishes both as a GitHub Release (Releases section on the repo page).
+# Start it from: Actions tab → "Build Nova OS ISO" → Run workflow.
+name: Build Nova OS ISO
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  iso:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    container:
+      image: debian:bookworm
+      options: --privileged
+    steps:
+      - name: Get tools
+        run: apt-get update && apt-get install -y git nodejs npm qemu-system-x86 netpbm python3
+
+      - uses: actions/checkout@v4
+
+      - name: Install Nova dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build ISO
+        run: bash iso/build-iso.sh
+
+      - name: Test-boot the ISO in a virtual machine
+        run: |
+          ACCEL="-accel tcg"; [ -e /dev/kvm ] && ACCEL="-enable-kvm"
+          echo "Using: $ACCEL"
+          qemu-system-x86_64 $ACCEL -m 3072 -smp 2 -vga std -display none \
+            -cdrom dist/nova-os-amd64.iso -boot d \
+            -monitor unix:/tmp/qmon,server,nowait -daemonize
+          mon() { echo "$1" | python3 -c "import socket,sys;s=socket.socket(socket.AF_UNIX);s.connect('/tmp/qmon');s.send(sys.stdin.read().encode()+b'\n');import time;time.sleep(1)"; }
+          sleep 20; mon "sendkey ret"            # pick the first boot menu entry
+          for t in 60 120 180 240; do
+            sleep 60; mon "screendump /tmp/boot-$t.ppm"
+          done
+          mon "quit" || true
+          mkdir -p dist
+          for f in /tmp/boot-*.ppm; do pnmtopng "$f" > "dist/$(basename "$f" .ppm).png"; done
+          ls -la dist
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nova-os-build-${{ github.run_number }}
+          name: Nova OS build ${{ github.run_number }}
+          body: |
+            Bootable Nova OS image. Write **nova-os-amd64.iso** to a USB stick with Rufus or balenaEtcher and boot from it.
+            The boot-*.png files are screenshots from an automatic test boot in a virtual machine (taken 1, 2, 3 and 4 minutes after power-on).
+          files: |
+            dist/nova-os-amd64.iso
+            dist/boot-*.png
+            dist/build.log
+
+      - name: Upload build log if something failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: dist/build.log

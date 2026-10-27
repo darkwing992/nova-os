@@ -1,0 +1,34 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Files</title><link rel="stylesheet" href="app.css">
+<style>
+body { overflow-y: auto; padding: 50px 40px; background: #0e1424; }
+h1 { margin: 0 0 20px; } h2 { color: #8b90b3; font-size: 15px; text-transform: uppercase; letter-spacing: 1px; margin: 28px 0 10px; }
+.files { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.file { background: rgba(255,255,255,.05); border-radius: 12px; padding: 14px; display: flex; gap: 12px; align-items: center; overflow: hidden; }
+.file .i { font-size: 30px; } .file small { display: block; color: #8b90b3; font-size: 12px; }
+.file img { width: 64px; height: 44px; object-fit: cover; border-radius: 6px; background: #fff; }
+.empty { color: #8b90b3; }
+</style></head>
+<body>
+<h1>📁 Files</h1>
+<h2>Drawings</h2><div class="files" id="art"></div>
+<h2>Notes</h2><div class="files" id="notes"></div>
+<h2>Game saves</h2><div class="files" id="saves"></div>
+<h2>Installed apps</h2><div class="files" id="apps"></div>
+<script src="sdk.js"></script>
+<script>
+const box = (id, items) => { const el = document.getElementById(id);
+  el.innerHTML = items.length ? '' : '<div class="empty">Nothing here yet</div>';
+  items.forEach((it) => { const d = document.createElement('div'); d.className = 'file';
+    d.innerHTML = (it.img ? `<img src="${it.img}">` : `<span class="i">${it.icon}</span>`) + '<div><b></b><small></small></div>';
+    d.querySelector('b').textContent = it.name; d.querySelector('small').textContent = it.sub; el.appendChild(d); }); };
+box('art', Nova.load('paint.gallery', []).map((g, i) => ({ img: g.img, name: 'Drawing ' + (i + 1), sub: new Date(g.t).toLocaleDateString() })));
+box('notes', Nova.load('notes', []).map((n) => ({ icon: '📝', name: n.title || 'Untitled', sub: n.body.length + ' characters' })));
+const saves = [];
+for (const k in localStorage) if (k.startsWith('nova.app.') && k.endsWith('.best')) saves.push({ icon: '🏆', name: k.slice(9, -5), sub: 'Best: ' + localStorage.getItem(k) });
+box('saves', saves);
+let st = {}; try { st = JSON.parse(localStorage.getItem('nova.state') || '{}'); } catch (_) {}
+box('apps', (st.installed || []).map((id) => ({ icon: '📦', name: id, sub: 'Installed' })));
+(function loop() { Nova.poll(); requestAnimationFrame(loop); })();
+</script>
+</body></html>

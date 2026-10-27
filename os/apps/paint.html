@@ -1,0 +1,57 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Paint</title><link rel="stylesheet" href="app.css">
+<style>
+body { display: flex; flex-direction: column; background: #1a1b26; }
+.tools { display: flex; gap: 10px; align-items: center; padding: 46px 20px 12px; flex-wrap: wrap; }
+.sw { width: 34px; height: 34px; border-radius: 50%; border: 3px solid transparent; }
+.sw.on { border-color: #fff; }
+.tools button.t { background: rgba(255,255,255,.08); border: 0; border-radius: 8px; padding: 8px 14px; }
+.tools input[type=range] { width: 140px; }
+.wrap { flex: 1; display: grid; place-items: center; padding: 0 20px 20px; }
+#c { background: #fff; cursor: crosshair; touch-action: none; max-height: 100%; }
+</style></head>
+<body>
+<div class="tools" id="tools">
+  <label>Size <input type="range" id="size" min="2" max="60" value="8"></label>
+  <button class="t" id="eraser">🧽 Eraser</button>
+  <button class="t" id="clear">🗑️ Clear</button>
+  <button class="t" id="save">💾 Save to Files</button>
+</div>
+<div class="wrap"><canvas id="c" width="1100" height="620"></canvas></div>
+<script src="sdk.js"></script>
+<script>
+const c = document.getElementById('c'), x = c.getContext('2d');
+const COLORS = ['#000000', '#ffffff', '#ff3b3b', '#ff8a00', '#ffd400', '#00c27a', '#00b3ff', '#7c5cff', '#ff5cc8', '#8b5a2b'];
+let color = '#000000', erasing = false, drawing = false, lastPt = null;
+x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+const tools = document.getElementById('tools');
+COLORS.forEach((col, i) => { const b = document.createElement('button'); b.className = 'sw' + (i === 0 ? ' on' : ''); b.style.background = col;
+  b.onclick = () => { color = col; erasing = false; tools.querySelectorAll('.sw').forEach((s) => s.classList.toggle('on', s === b)); }; tools.insertBefore(b, tools.firstChild); });
+const pt = (e) => { const r = c.getBoundingClientRect(); return { x: (e.clientX - r.left) * c.width / r.width, y: (e.clientY - r.top) * c.height / r.height }; };
+function line(a, b) { x.strokeStyle = erasing ? '#fff' : color; x.lineWidth = +document.getElementById('size').value; x.lineCap = x.lineJoin = 'round';
+  x.beginPath(); x.moveTo(a.x, a.y); x.lineTo(b.x, b.y); x.stroke(); }
+c.onpointerdown = (e) => { drawing = true; lastPt = pt(e); line(lastPt, lastPt); c.setPointerCapture(e.pointerId); };
+c.onpointermove = (e) => { if (!drawing) return; const p = pt(e); line(lastPt, p); lastPt = p; };
+c.onpointerup = () => { drawing = false; };
+document.getElementById('eraser').onclick = () => { erasing = true; };
+document.getElementById('clear').onclick = () => { x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); };
+document.getElementById('save').onclick = () => {
+  const small = document.createElement('canvas'); small.width = 440; small.height = 248;
+  small.getContext('2d').drawImage(c, 0, 0, small.width, small.height);
+  const g = Nova.load('paint.gallery', []); g.unshift({ img: small.toDataURL('image/jpeg', 0.8), t: Date.now() });
+  Nova.save('paint.gallery', g.slice(0, 20)); Nova.toast('🎨 Drawing saved to Files');
+};
+// controller drawing: stick moves a cursor, hold A to draw
+let cur = { x: c.width / 2, y: c.height / 2 };
+(function loop() {
+  const i = Nova.poll();
+  const dx = (i.ax || 0) + (Nova.down('right') - Nova.down('left')) * 0.6, dy = (i.ay || 0) + (Nova.down('down') - Nova.down('up')) * 0.6;
+  if (dx || dy || Nova.down('a')) {
+    const nx = Math.max(0, Math.min(c.width, cur.x + dx * 9)), ny = Math.max(0, Math.min(c.height, cur.y + dy * 9));
+    if (i.a && navigator.getGamepads && [...navigator.getGamepads()].some(Boolean)) line(cur, { x: nx, y: ny });
+    cur = { x: nx, y: ny };
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body></html>

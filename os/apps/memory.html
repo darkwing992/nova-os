@@ -1,0 +1,81 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Memory Match</title><link rel="stylesheet" href="app.css">
+<style>
+.board { display: grid; grid-template-columns: repeat(6, 110px); gap: 14px; perspective: 800px; }
+.card { width: 110px; height: 130px; border: 0; border-radius: 14px; position: relative; transform-style: preserve-3d; transition: transform .35s; background: none; padding: 0; }
+.card.up, .card.done { transform: rotateY(180deg); }
+.card .f, .card .b { position: absolute; inset: 0; border-radius: 14px; backface-visibility: hidden; display: grid; place-items: center; }
+.card .b { background: linear-gradient(135deg, #8e2de2, #4a00e0); font-size: 34px; color: rgba(255,255,255,.4); }
+.card .f { background: #f4f1ff; transform: rotateY(180deg); font-size: 56px; }
+.card.done .f { background: #c9f7d9; }
+.card.sel { outline: 4px solid #ffd67a; outline-offset: 4px; }
+@media (max-width: 800px) { .board { grid-template-columns: repeat(4, 80px); } .card { width: 80px; height: 96px; } .card .f { font-size: 40px; } }
+</style></head>
+<body>
+<div class="stage">
+  <div class="hud"><div><span>MOVES</span><b id="moves">0</b></div><div><span>PAIRS</span><b id="pairs">0/12</b></div><div><span>BEST</span><b id="best">-</b></div></div>
+  <div class="board" id="board"></div>
+  <div class="help">Arrows / D-pad to pick · Enter / A to flip · click works too</div>
+</div>
+<div class="overlay hidden" id="ov"><h1>YOU WIN!</h1><p id="ovP"></p></div>
+<script src="sdk.js"></script>
+<script>
+const ICONS = ['🍕', '🚀', '🐙', '🎸', '🌵', '🦊', '🍩', '⚡', '🎲', '🐢', '🌈', '👾'];
+const board = document.getElementById('board');
+let cards, open, moves, pairs, sel = 0, lock = false, best = Nova.load('memory.best', null);
+const cols = () => getComputedStyle(board).gridTemplateColumns.split(' ').length;
+document.getElementById('best').textContent = best ?? '-';
+
+function newGame() {
+  const deck = [...ICONS, ...ICONS].sort(() => Math.random() - 0.5);
+  board.innerHTML = ''; open = []; moves = 0; pairs = 0; lock = false;
+  cards = deck.map((icon, i) => {
+    const b = document.createElement('button');
+    b.className = 'card'; b.innerHTML = `<div class="b">?</div><div class="f">${icon}</div>`;
+    b.onclick = () => { sel = i; flip(i); };
+    board.appendChild(b);
+    return { icon, el: b, done: false };
+  });
+  document.getElementById('ov').classList.add('hidden');
+  hud(); select(0);
+}
+function hud() { document.getElementById('moves').textContent = moves; document.getElementById('pairs').textContent = pairs + '/12'; }
+function select(i) { sel = (i + cards.length) % cards.length; cards.forEach((c, j) => c.el.classList.toggle('sel', j === sel)); }
+function flip(i) {
+  const c = cards[i];
+  if (lock || c.done || open.includes(c)) return;
+  c.el.classList.add('up'); open.push(c); Nova.beep(600, 0.05, 'triangle');
+  if (open.length === 2) {
+    moves++; hud();
+    const [a, b] = open;
+    if (a.icon === b.icon) {
+      a.done = b.done = true; a.el.classList.add('done'); b.el.classList.add('done'); open = []; pairs++; hud();
+      Nova.beep(900, 0.15, 'triangle');
+      if (pairs === 12) win();
+    } else {
+      lock = true;
+      setTimeout(() => { a.el.classList.remove('up'); b.el.classList.remove('up'); open = []; lock = false; }, 800);
+    }
+  }
+}
+function win() {
+  if (best == null || moves < best) { best = moves; Nova.save('memory.best', best); document.getElementById('best').textContent = best; Nova.toast('🃏 New best: ' + best + ' moves'); }
+  document.getElementById('ovP').textContent = `You did it in ${moves} moves · Press Enter or A to play again`;
+  setTimeout(() => document.getElementById('ov').classList.remove('hidden'), 500);
+}
+function loop() {
+  Nova.poll();
+  if (!document.getElementById('ov').classList.contains('hidden')) { if (Nova.tap('a')) newGame(); }
+  else {
+    const n = cols();
+    if (Nova.tap('left')) select(sel - 1);
+    if (Nova.tap('right')) select(sel + 1);
+    if (Nova.tap('up')) select(sel - n);
+    if (Nova.tap('down')) select(sel + n);
+    if (Nova.tap('a')) flip(sel);
+  }
+  requestAnimationFrame(loop);
+}
+newGame(); loop();
+</script>
+</body></html>

@@ -1,0 +1,64 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Paddle Duel</title><link rel="stylesheet" href="app.css"></head>
+<body>
+<div class="stage">
+  <canvas id="c" width="900" height="560"></canvas>
+  <div class="help">Player 1: W / S or controller 1 · Player 2: ↑ / ↓ or controller 2 · First to 7 wins</div>
+</div>
+<div class="overlay" id="ov"><h1 id="ovT">PADDLE DUEL</h1><p id="ovP">Press 1 for vs Computer · Press 2 for 2 Players<br>(or A = vs Computer, Y = 2 Players)</p></div>
+<script src="sdk.js"></script>
+<script>
+const c = document.getElementById('c'), x = c.getContext('2d');
+const PH = 90, PW = 14, WIN = 7;
+let p1, p2, ball, s1, s2, twoPlayer = false, state = 'menu', last = 0, serveT = 0;
+
+function start(two) { twoPlayer = two; s1 = s2 = 0; p1 = c.height / 2; p2 = c.height / 2; serve(1); state = 'play'; document.getElementById('ov').classList.add('hidden'); }
+function serve(dir) { ball = { x: c.width / 2, y: c.height / 2, vx: 0, vy: 0 }; serveT = 0.8; ball.dir = dir; }
+function pad(i) { const p = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean)[i] : null; if (!p) return 0;
+  return (p.buttons[13]?.pressed ? 1 : 0) - (p.buttons[12]?.pressed ? 1 : 0) + (Math.abs(p.axes[1]) > 0.2 ? p.axes[1] : 0); }
+
+function update(dt) {
+  const sp = 520;
+  p1 += ((Nova.key('KeyS') ? 1 : 0) - (Nova.key('KeyW') ? 1 : 0) + pad(0)) * sp * dt;
+  if (twoPlayer) p2 += ((Nova.key('ArrowDown') ? 1 : 0) - (Nova.key('ArrowUp') ? 1 : 0) + pad(1)) * sp * dt;
+  else { const target = ball.vx > 0 ? ball.y : c.height / 2; p2 += Math.max(-1, Math.min(1, (target - p2) / 30)) * (sp * 0.72) * dt; }
+  if (!twoPlayer) p1 += ((Nova.key('ArrowDown') ? 1 : 0) - (Nova.key('ArrowUp') ? 1 : 0)) * sp * dt;
+  p1 = Math.max(PH / 2, Math.min(c.height - PH / 2, p1)); p2 = Math.max(PH / 2, Math.min(c.height - PH / 2, p2));
+  if (serveT > 0) { serveT -= dt; if (serveT <= 0) { ball.vx = 380 * ball.dir; ball.vy = (Math.random() - 0.5) * 300; } return; }
+  ball.x += ball.vx * dt; ball.y += ball.vy * dt;
+  if (ball.y < 8 || ball.y > c.height - 8) { ball.vy *= -1; ball.y = Math.max(8, Math.min(c.height - 8, ball.y)); Nova.beep(300, 0.03); }
+  const hit = (py, side) => { const rel = (ball.y - py) / (PH / 2); const s = Math.min(1100, Math.hypot(ball.vx, ball.vy) * 1.06);
+    ball.vx = side * s * Math.cos(rel * 0.9); ball.vy = s * Math.sin(rel * 0.9); Nova.beep(side > 0 ? 500 : 640, 0.05); };
+  if (ball.vx < 0 && ball.x < 40 + PW && ball.x > 30 && Math.abs(ball.y - p1) < PH / 2 + 8) hit(p1, 1);
+  if (ball.vx > 0 && ball.x > c.width - 40 - PW && ball.x < c.width - 30 && Math.abs(ball.y - p2) < PH / 2 + 8) hit(p2, -1);
+  if (ball.x < -20) { s2++; Nova.beep(150, 0.3, 'sawtooth'); check() || serve(-1); }
+  if (ball.x > c.width + 20) { s1++; Nova.beep(150, 0.3, 'sawtooth'); check() || serve(1); }
+}
+function check() {
+  if (s1 < WIN && s2 < WIN) return false;
+  state = 'over';
+  document.getElementById('ovT').textContent = s1 > s2 ? 'PLAYER 1 WINS' : twoPlayer ? 'PLAYER 2 WINS' : 'COMPUTER WINS';
+  document.getElementById('ov').classList.remove('hidden');
+  return true;
+}
+function draw() {
+  x.fillStyle = '#0b1820'; x.fillRect(0, 0, c.width, c.height);
+  x.fillStyle = 'rgba(255,255,255,.15)'; for (let y = 10; y < c.height; y += 30) x.fillRect(c.width / 2 - 2, y, 4, 16);
+  x.font = 'bold 64px sans-serif'; x.textAlign = 'center'; x.fillStyle = 'rgba(255,255,255,.25)';
+  x.fillText(s1, c.width / 2 - 80, 80); x.fillText(s2, c.width / 2 + 80, 80);
+  x.shadowBlur = 16; x.shadowColor = '#5ce1e6'; x.fillStyle = '#5ce1e6';
+  x.fillRect(30, p1 - PH / 2, PW, PH); x.shadowColor = '#ff7eb3'; x.fillStyle = '#ff7eb3'; x.fillRect(c.width - 30 - PW, p2 - PH / 2, PW, PH);
+  x.shadowColor = '#fff'; x.fillStyle = '#fff'; x.beginPath(); x.arc(ball.x, ball.y, 8, 0, 7); x.fill(); x.shadowBlur = 0;
+}
+function loop(t) {
+  const dt = Math.min(0.033, (t - last) / 1000); last = t;
+  Nova.poll();
+  if (state === 'play') update(dt);
+  else if (Nova.key('Digit1') || Nova.tap('a')) start(false);
+  else if (Nova.key('Digit2') || Nova.tap('y')) start(true);
+  draw();
+  requestAnimationFrame(loop);
+}
+s1 = s2 = 0; p1 = p2 = c.height / 2; serve(1); requestAnimationFrame(loop);
+</script>
+</body></html>

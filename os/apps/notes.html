@@ -1,0 +1,47 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Notes</title><link rel="stylesheet" href="app.css">
+<style>
+body { display: flex; background: #12131f; }
+aside { width: 280px; background: #0b0c16; padding: 50px 14px 14px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+aside button { text-align: left; background: rgba(255,255,255,.04); border: 1px solid transparent; border-radius: 10px; padding: 12px; }
+aside button.on { border-color: #f7b733; background: rgba(247,183,51,.12); }
+aside .new { background: #f7b733; color: #000; font-weight: 700; text-align: center; }
+aside small { display: block; color: #8b90b3; font-size: 12px; margin-top: 4px; }
+section { flex: 1; display: flex; flex-direction: column; padding: 50px 40px 30px; gap: 12px; }
+#title { background: none; border: 0; font-size: 30px; font-weight: 700; font-family: inherit; color: inherit; outline: none; }
+textarea { flex: 1; background: none; border: 0; resize: none; color: inherit; font-size: 18px; line-height: 1.6; font-family: inherit; outline: none; }
+.row { display: flex; gap: 10px; } .row button { background: rgba(255,255,255,.06); border: 0; border-radius: 8px; padding: 8px 14px; }
+</style></head>
+<body>
+<aside id="list"></aside>
+<section>
+  <input id="title" placeholder="Title">
+  <textarea id="body" placeholder="Start typing…"></textarea>
+  <div class="row"><button id="del">🗑️ Delete note</button></div>
+</section>
+<script src="sdk.js"></script>
+<script>
+let notes = Nova.load('notes', [{ id: 1, title: 'Welcome to Notes', body: 'Everything you type here saves automatically.\n\nTip: press F1 or the Home button any time to go back to the dashboard.', t: Date.now() }]);
+let cur = notes[0]?.id;
+const $ = (i) => document.getElementById(i);
+const persist = () => Nova.save('notes', notes);
+function render() {
+  const l = $('list'); l.innerHTML = '';
+  const nb = document.createElement('button'); nb.className = 'new'; nb.textContent = '+ New note';
+  nb.onclick = () => { const n = { id: Date.now(), title: '', body: '', t: Date.now() }; notes.unshift(n); cur = n.id; persist(); render(); $('title').focus(); };
+  l.appendChild(nb);
+  notes.forEach((n) => { const b = document.createElement('button'); b.className = n.id === cur ? 'on' : '';
+    b.innerHTML = `<b></b><small>${new Date(n.t).toLocaleString()}</small>`; b.querySelector('b').textContent = n.title || 'Untitled';
+    b.onclick = () => { cur = n.id; render(); }; l.appendChild(b); });
+  const n = notes.find((n) => n.id === cur);
+  $('title').value = n ? n.title : ''; $('body').value = n ? n.body : '';
+  $('title').disabled = $('body').disabled = !n;
+}
+function edit() { const n = notes.find((n) => n.id === cur); if (!n) return; n.title = $('title').value; n.body = $('body').value; n.t = Date.now(); persist();
+  const b = $('list').querySelector('.on b'); if (b) b.textContent = n.title || 'Untitled'; }
+$('title').oninput = edit; $('body').oninput = edit;
+$('del').onclick = () => { notes = notes.filter((n) => n.id !== cur); cur = notes[0]?.id; persist(); render(); Nova.toast('Note deleted'); };
+render();
+(function loop() { Nova.poll(); requestAnimationFrame(loop); })();
+</script>
+</body></html>
