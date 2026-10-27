@@ -35,7 +35,7 @@ lb config \
   --iso-application "Nova OS" \
   --iso-volume "NOVA_OS" \
   --iso-publisher "Nova OS" \
-  --bootappend-live "boot=live components nocomponents=user-setup,sudo,login,xinit quiet splash loglevel=3 hostname=nova" \
+  --bootappend-live "boot=live components nocomponents=user-setup,sudo,login,xinit quiet splash loglevel=3 hostname=nova username=nova" \
   --memtest none
 
 echo "==> Package list"
@@ -96,7 +96,7 @@ unzip -q -o /tmp/electron-linux.zip -d "$APPDIR/electron"
 
 # boot straight into Nova: auto-login on screen 1, start X, run Nova full screen
 mkdir -p config/includes.chroot/etc/systemd/system/getty@tty1.service.d
-cat > config/includes.chroot/etc/systemd/system/getty@tty1.service.d/autologin.conf <<'EOF'
+cat > config/includes.chroot/etc/systemd/system/getty@tty1.service.d/zz-nova-autologin.conf <<'EOF'
 [Service]
 ExecStart=
 ExecStart=-/sbin/agetty --autologin nova --noclear %I $TERM
