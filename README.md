@@ -36,6 +36,9 @@ In the Store: Memory Match, Paddle Duel, Paint, Calculator, Synth Pad, YouTube (
 - To make your own downloadable app: zip a folder that has an `index.html`, and optionally a `nova.json`:
   `{ "name": "My Game", "icon": "🚀", "type": "game", "developer": "Me", "description": "..." }`
 
+## Download the bootable .iso
+Get **nova-os-amd64.iso** from the newest build on the [Releases page](https://github.com/darkwing992/nova-os/releases). Each release also has screenshots from an automatic test boot.
+
 ## Make the bootable .iso
 The ISO boots straight into Nova from a USB stick, and its boot menu has **Install** to put Nova permanently on the computer.
 
